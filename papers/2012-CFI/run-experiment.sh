@@ -8,6 +8,7 @@ fi
 
 
 __CLICK=/home/yjaeyong/VisualXSwitch/userlevel/click
+#__CLICK=/home/netcs/VisualXSwitch/userlevel/click
 __SEC_CHAN=/home/netcs/packages/icc-sdn/openflow-1.0.0/secchan/ofprotocol
 
 # desc:
