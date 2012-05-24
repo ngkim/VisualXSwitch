@@ -155,9 +155,34 @@ int VxSInNetworkTaskDispatcher::run_action_on_task( VxSInNetworkTask *task, stru
 						click_chatter("OOPS: ACTION HEADER GETS NULL!?\n");
 						break;
 					}
-
 				}
 				_task_queue_incoming->pushTask( copied_task );
+			}
+			break;
+		}
+
+		case OFPAT_VXS_YUV2RGB_DXTC:
+		{
+			VxSInNetworkCompute *c = lookupCompute("CUDA_DXTC");
+			if( c == NULL ) {
+				click_chatter("Error: CUDA_DXTC not found\n");
+			} else { /* task is done */
+				int re;
+
+				sem_wait( &_sem_GPU );
+
+				/* TODO: make this input mode thing as parametric form of OFPAT_VXS_DXTComp */
+				((VxSInNetworkComputeDXTC *)c)->set_input_mode( 1 ); /* rgb4 */
+
+				/* do we need explicit type-casting ? */
+				re = ((VxSInNetworkComputeDXTC *)c)->compute( task->getSegment() );
+
+				sem_post( &_sem_GPU );
+
+				task->taskDone();
+				task->setReturnValue( re );
+
+				s = (VxSInNetworkRawSegment *)task->getSegment();
 			}
 			break;
 		}
@@ -171,6 +196,8 @@ int VxSInNetworkTaskDispatcher::run_action_on_task( VxSInNetworkTask *task, stru
 				int re;
 
 				sem_wait( &_sem_GPU );
+
+				((VxSInNetworkComputeDXTC *)c)->set_input_mode( 0 ); /* rgb4 */
 
 				/* do we need explicit type-casting ? */
 				re = ((VxSInNetworkComputeDXTC *)c)->compute( task->getSegment() );
@@ -209,6 +236,7 @@ int VxSInNetworkTaskDispatcher::run_action_on_task( VxSInNetworkTask *task, stru
 
 		case OFPAT_VXS_FrameResize:
 		{
+			/* TODO: frame resize should be paramatized */
 			VxSInNetworkCompute *c = lookupCompute("FRAME_RESIZE");
 			if( c == NULL ) {
 				click_chatter("Error: CUDA_DXTC not found\n");
@@ -264,6 +292,7 @@ int VxSInNetworkTaskDispatcher::run_action_on_task( VxSInNetworkTask *task, stru
 			memcpy(eh->eth_dst, da->dl_addr, sizeof eh->eth_dst);
 			break;
 		}
+
 		case OFPAT_SET_NW_DST:
 		{
 			struct ofp_action_nw_addr *da = (struct ofp_action_nw_addr *)ah;
@@ -275,6 +304,7 @@ int VxSInNetworkTaskDispatcher::run_action_on_task( VxSInNetworkTask *task, stru
 			}
 			break;
 		}
+
 		case OFPAT_SET_TP_DST:
 		{
 			struct ofp_action_tp_port *ta = (struct ofp_action_tp_port *)ah;
@@ -291,7 +321,6 @@ int VxSInNetworkTaskDispatcher::run_action_on_task( VxSInNetworkTask *task, stru
 			}
 			break;
 		}
-
 	
 		default:
 			click_chatter("Unimplemented of action: %d\n", ah->type );

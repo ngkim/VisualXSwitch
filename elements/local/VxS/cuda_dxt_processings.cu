@@ -251,7 +251,21 @@ __global__ void ckernel_dxt_compress_from_yuv2_or_rgb4(uint32_t *input, uint16_t
 	output[gid].y = tmp;	
 }
 
-extern "C" void dxt_compress_from_yuv2(uint32_t *d_data, uint32_t *d_result, uint32_t total_dxt_blocks)
+extern "C" void dxt_compress_from_yuv2_or_rgb4(uint32_t *d_data, uint32_t *d_result, uint32_t total_dxt_blocks, uint32_t yuv2)
+{	
+	uint32_t total_cuda_blocks = total_dxt_blocks / NUM_THREADS;
+	if( total_dxt_blocks % NUM_THREADS ) total_cuda_blocks ++;
+
+	ckernel_dxt_compress_from_yuv2_or_rgb4<<<total_cuda_blocks, NUM_THREADS>>>(d_data, 
+			yuv2, /* 1 indicates yuv2; 0 indicates rgb4 */
+			(uint2*)d_result, 
+			0, 
+			total_dxt_blocks);
+
+	cudaThreadSynchronize();
+}
+
+extern "C" void dxt_compress_from_rgb4(uint32_t *d_data, uint32_t *d_result, uint32_t total_dxt_blocks)
 {	
 	uint32_t total_cuda_blocks = total_dxt_blocks / NUM_THREADS;
 	if( total_dxt_blocks % NUM_THREADS ) total_cuda_blocks ++;
@@ -438,12 +452,6 @@ __global__ void ckernel_frame_resize(uint32_t *input, uint32_t *output, uint32_t
 	// temporal variable for 2x2 average mask
 	__shared__ ushort3 avg_mask[NUM_THREADS];
 
-	int i;
-	int total_pixels = 16;
-	int pixel_position; /* target_pixel position */
-	int orig_pixel_position;
-	int tmp_residual_width;
-
 	scaleColorBlock(input, output, avg_mask, total_dxt_blocks,
 			orig_width, target_width, blockOffset);
 
@@ -458,7 +466,6 @@ extern "C" int frame_resize(uint32_t *d_data, uint32_t *d_result, uint32_t total
 
 	//uint mpcount = deviceProp.multiProcessorCount;
         uint mpcount = 16;
-        const uint memSize = IMAGE_WIDTH * IMAGE_HEIGHT / 2;
 
         // Determine launch configuration and run timed computation numIterations times
         uint blocks = ((target_width + 3) / 4) * ((target_height + 3) / 4); // rounds up by 1 block in each dim if %4 != 0
